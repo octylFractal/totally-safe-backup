@@ -1,0 +1,19 @@
+{
+    "required": true,
+    "package": "net.octyl.totallysafebackup.mixin",
+    "compatibilityLevel": "JAVA_17",
+    "mixins": [
+        "BackupStateMinecraftServer",
+        "SaveBlockerMinecraftServer",
+        "SaveBlockerPlayerList",
+        "SaveBlockerServerLevel"
+    ],
+    "server": [
+    ],
+    "client": [
+    ],
+    "injectors": {
+        "defaultRequire": 1
+    },
+    "refmap": "totally_safe_backup.mixins.refmap.json"
+}

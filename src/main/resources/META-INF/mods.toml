@@ -1,0 +1,26 @@
+modLoader = "javafml"
+loaderVersion = "[40,)"
+license = "MPL-2.0"
+
+[[mods]]
+modId = "totally_safe_backup"
+version = "${file.jarVersion}"
+displayName = "totally-safe-backup"
+authors = "octylFractal"
+description = '''
+A backup mod designed with safety in mind.
+'''
+
+[[dependencies.totally_safe_backup]]
+modId = "forge"
+mandatory = true
+versionRange = "[${forgeVersion},)"
+ordering = "NONE"
+side = "SERVER"
+
+[[dependencies.totally_safe_backup]]
+modId = "minecraft"
+mandatory = true
+versionRange = "[${minecraftVersion},${nextMajorMinecraftVersion})"
+ordering = "NONE"
+side = "SERVER"
