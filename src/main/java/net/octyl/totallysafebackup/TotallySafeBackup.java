@@ -87,9 +87,10 @@ public class TotallySafeBackup {
         event.getDispatcher().register(
             Commands.literal("totally-safe-backup")
                 .requires(ctx -> ctx.hasPermission(2))
-                .then(Commands.literal("perform").executes(
-                    ctx -> performBackup(new BackupWorker(ctx.getSource().getServer())) ? 1 : 0
-                ))
+                .then(Commands.literal("perform").executes(ctx -> {
+                    BACKUP_EXECUTOR.execute(() -> performBackup(new BackupWorker(ctx.getSource().getServer())));
+                    return 1;
+                }))
         );
     }
 
@@ -102,12 +103,11 @@ public class TotallySafeBackup {
         );
     }
 
-    private boolean performBackup(BackupWorker worker) {
+    private void performBackup(BackupWorker worker) {
         var timestamp = ZonedDateTime.now(ZoneOffset.UTC);
         var targetZipPath = backupDir.resolve(FILE_SAFE_DATE_FORMAT.format(timestamp) + ".zip");
         try (var targetZip = new ZipOutputStream(Files.newOutputStream(targetZipPath))) {
             worker.runBackupProcess(new ZipBackupTarget(targetZipPath.toString(), targetZip));
-            return true;
         } catch (Throwable mainThrowable) {
             LOGGER.warn("Failed to perform backup", mainThrowable);
             try {
@@ -119,7 +119,6 @@ public class TotallySafeBackup {
             if (mainThrowable instanceof Error err) {
                 throw err;
             }
-            return false;
         }
     }
 
