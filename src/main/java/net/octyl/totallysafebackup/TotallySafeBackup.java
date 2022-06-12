@@ -38,7 +38,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.zip.ZipOutputStream;
@@ -59,15 +58,9 @@ public class TotallySafeBackup {
 
     private static final DateTimeFormatter FILE_SAFE_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH_mm_ss");
 
-    private static final ScheduledExecutorService BACKUP_EXECUTOR =
-        Executors.newSingleThreadScheduledExecutor(new ThreadFactoryBuilder()
-            .setDaemon(true)
-            .setNameFormat("totally-safe-backup-thread-%d")
-            .build());
-
     private final Path backupDir;
 
-    private ScheduledFuture<?> backupTask;
+    private ScheduledExecutorService backupExecutor;
 
     /**
      * Create a new instance of the mod.
@@ -93,7 +86,7 @@ public class TotallySafeBackup {
             Commands.literal("totally-safe-backup")
                 .requires(ctx -> ctx.hasPermission(2))
                 .then(Commands.literal("perform").executes(ctx -> {
-                    BACKUP_EXECUTOR.execute(() -> performBackup(new BackupWorker(ctx.getSource().getServer())));
+                    backupExecutor.execute(() -> performBackup(new BackupWorker(ctx.getSource().getServer())));
                     return 1;
                 }))
         );
@@ -103,7 +96,11 @@ public class TotallySafeBackup {
     public void serverStarted(ServerStartedEvent event) {
         LOGGER.info("Server started, starting backup worker...");
         var worker = new BackupWorker(event.getServer());
-        backupTask = BACKUP_EXECUTOR.scheduleAtFixedRate(
+        backupExecutor = Executors.newSingleThreadScheduledExecutor(new ThreadFactoryBuilder()
+            .setDaemon(true)
+            .setNameFormat("totally-safe-backup-thread-%d")
+            .build());
+        backupExecutor.scheduleAtFixedRate(
             () -> performBackup(worker), 60, 60, TimeUnit.MINUTES
         );
     }
@@ -154,7 +151,14 @@ public class TotallySafeBackup {
     @SubscribeEvent
     public void serverStopping(ServerStoppingEvent event) {
         LOGGER.info("Server stopping, cancelling backup worker...");
-        backupTask.cancel(true);
-        backupTask = null;
+        backupExecutor.shutdownNow();
+        try {
+            if (!backupExecutor.awaitTermination(5, TimeUnit.MINUTES)) {
+                LOGGER.warn("Backup executor did not terminate in time," +
+                    " accepting corrupt state in exchange for eventual shutdown");
+            }
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

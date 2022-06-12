@@ -111,6 +111,10 @@ public class BackupWorker {
         Files.walkFileTree(worldDir, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                // Die if we were asked to
+                if (Thread.currentThread().isInterrupted()) {
+                    throw new RuntimeException("Backup interrupted!");
+                }
                 // Skip the session lock file
                 if (file.getFileName().toString().equals("session.lock")) {
                     return FileVisitResult.CONTINUE;
