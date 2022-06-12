@@ -27,15 +27,20 @@ import net.octyl.totallysafebackup.backup.target.ZipBackupTarget;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import java.util.zip.ZipOutputStream;
 
 /**
@@ -99,7 +104,7 @@ public class TotallySafeBackup {
         LOGGER.info("Server started, starting backup worker...");
         var worker = new BackupWorker(event.getServer());
         backupTask = BACKUP_EXECUTOR.scheduleAtFixedRate(
-            () -> performBackup(worker), 30, 30, TimeUnit.MINUTES
+            () -> performBackup(worker), 60, 60, TimeUnit.MINUTES
         );
     }
 
@@ -119,6 +124,30 @@ public class TotallySafeBackup {
             if (mainThrowable instanceof Error err) {
                 throw err;
             }
+            return;
+        }
+
+        LOGGER.info("Backup completed, deleting old backups if needed...");
+        try {
+            while (true) {
+                List<Path> files;
+                try (var fileList = Files.list(backupDir)) {
+                    files = fileList.collect(Collectors.toCollection(ArrayList::new));
+                }
+                // Save 24 hours worth of backups
+                if (files.size() <= 24) {
+                    LOGGER.info("No old backups to delete, done!");
+                    return;
+                }
+                // Because all backups are saved with FILE_SAFE_DATE_FORMAT, we can sort them by their timestamp
+                // Then the first one is the oldest one!
+                files.sort(Comparator.comparing(p -> p.getFileName().toString()));
+                var oldestFile = files.get(0);
+                LOGGER.info("Deleting old backup file {}", oldestFile);
+                Files.deleteIfExists(oldestFile);
+            }
+        } catch (IOException e) {
+            LOGGER.warn("Failed to clear old backups", e);
         }
     }
 
